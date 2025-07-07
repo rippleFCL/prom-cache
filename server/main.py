@@ -28,7 +28,6 @@ class BackgroundJob:
                 self._response.raise_for_status()
             except requests.RequestException as e:
                 print(f"Error during request: {e}")
-                self._response = None
 
             if time.time() - self.time_since_last_grab > 600:
                 print("response not served in 10 minutes, stopping thread")
