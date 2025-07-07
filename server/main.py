@@ -12,27 +12,33 @@ class BackgroundJob:
         self.endpoint = endpoint
         self.params = params or {}
         self.thread = threading.Thread(target=self.run)
+        self.resp_lock = threading.Lock()
         self._response: requests.Response | None = None
         self.time_since_last_grab = time.time()
         self.stopped = False
 
     @property
     def response(self):
-        self.time_since_last_grab = time.time()
-        return self._response
+        with self.resp_lock:
+            self.time_since_last_grab = time.time()
+            return self._response
 
     def run(self):
         while 1:
             try:
-                self._response = requests.get(self.endpoint, params=self.params)
-                self._response.raise_for_status()
+                response = requests.get(self.endpoint, params=self.params)
+                response.raise_for_status()
             except requests.RequestException as e:
                 print(f"Error during request: {e}")
-
-            if time.time() - self.time_since_last_grab > 600:
-                print("response not served in 10 minutes, stopping thread")
-                self.stopped = True
-                break
+            except Exception as e:
+                print(f"Unexpected error: {e}")
+            else:
+                with self.resp_lock:
+                    self._response = response
+                    if time.time() - self.time_since_last_grab > 600:
+                        print("response not served in 10 minutes, stopping thread")
+                        self.stopped = True
+                        break
             time.sleep(1)
 
     def start(self):
